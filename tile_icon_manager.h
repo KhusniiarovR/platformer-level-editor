@@ -50,6 +50,18 @@ public:
         return iconPaths.value(type, "");
     }
 
+    void updateButtonStyles(TileType selectedTile)
+    {
+        for (auto button : buttons) {
+            button->setStyleSheet("");
+        }
+
+        QPushButton* activeButton = buttons[selectedTile];
+        if (activeButton) {
+            activeButton->setStyleSheet("background-color: yellow;");
+        }
+    }
+
 private:
     QMap<TileType, QString> iconPaths;
     QMap<TileType, QPushButton*> buttons;

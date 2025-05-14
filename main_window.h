@@ -23,7 +23,8 @@ private:
 
     void clearLevel();
     void resizeLevel(int newWidth, int newHeight);
-
+    void newLevel();
+    void deleteLevel();
     void exportToFile();
 
     struct TileAction {
@@ -36,6 +37,7 @@ private:
 
     QStack<TileAction> undoStack;
     TileType selectedTile;
+    QPushButton* createButton(const QIcon &icon, TileType  tileType, QToolBar* layout);
 
     QTableWidget *level;
     QToolBar *buttonLayout;
@@ -48,7 +50,10 @@ private:
     int lastRow = -1;
     int lastCol = -1;
 
-    QPushButton* createButton(const QIcon &icon, TileType  tileType, QToolBar* layout);
+    QListWidget* levelListWidget;
+    void loadLevelListFromFile(const QString& path);
+    void parseLevel(const QString& levelString);
+    void saveLevel();
 };
 
 #endif // MAIN_WINDOW_H

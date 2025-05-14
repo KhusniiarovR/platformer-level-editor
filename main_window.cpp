@@ -2,14 +2,13 @@
 #include "utilities.h"
 
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent), selectedTile(TileType::Air)
+    : QMainWindow(parent), selectedTile(TileType::Wall)
 {
     QWidget *centralWidget = new QWidget(this);
     setCentralWidget(centralWidget);
     setWindowTitle("Level Editor");
     setFocusPolicy(Qt::StrongFocus);
     setFocus();
-
 
     QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
 
@@ -42,6 +41,7 @@ MainWindow::MainWindow(QWidget *parent)
         buttonLayout->addWidget(button);
         connect(button, &QPushButton::clicked, this, [this, type]() {
             this->selectedTile = type;
+            tileIconManager.updateButtonStyles(selectedTile);
         });
 
         tileIconManager.registerButton(type, iconPath, button);
@@ -55,6 +55,8 @@ MainWindow::MainWindow(QWidget *parent)
     addTileButton(TileType::Spikes,   "data/sprites/spikes.png");
     addTileButton(TileType::Enemy,    "data/sprites/enemy.png");
     addTileButton(TileType::Exit,     "data/sprites/exit.png");
+
+    tileIconManager.updateButtonStyles(selectedTile);
 
     mainLayout->addWidget(buttonLayout);
 
@@ -70,30 +72,147 @@ MainWindow::MainWindow(QWidget *parent)
     this->showMaximized();
 }
 
-QWidget* MainWindow::createActionButtons()
-{
-    QWidget* actionWidget = new QWidget();
-    QVBoxLayout* layout = new QVBoxLayout(actionWidget);
+void MainWindow::parseLevel(const QString& encryptedData) {
+    int rows, cols;
+    std::vector<char> data;
 
-    QPushButton* clearButton = new QPushButton("Clear");
+    if (!decrypt(encryptedData, rows, cols, data)) {
+        QMessageBox::warning(this, "Error", "Can't decode level");
+        return;
+    }
+
+    level->setRowCount(rows);
+    level->setColumnCount(cols);
+    resizeLevel(cols, rows);
+
+    QSize iconSize = level->iconSize() * 0.95;
+
+    for (int i = 0; i < rows; ++i) {
+        for (int j = 0; j < cols; ++j) {
+            QChar ch = data[i * cols + j];
+            QTableWidgetItem* item = new QTableWidgetItem();
+            item->setTextAlignment(Qt::AlignCenter);
+
+            QIcon icon;
+            switch (ch.toLatin1()) {
+                case ' ':   icon = tileIconManager.getScaledIcon("data/sprites/air.png", iconSize); break;
+                case '#':   icon = tileIconManager.getScaledIcon("data/sprites/wall.png", iconSize); break;
+                case '=':   icon = tileIconManager.getScaledIcon("data/sprites/wall_dark.png", iconSize); break;
+                case '*':   icon = tileIconManager.getScaledIcon("data/sprites/coin.png", iconSize); break;
+                case '@':   icon = tileIconManager.getScaledIcon("data/sprites/player.png", iconSize); break;
+                case '^':   icon = tileIconManager.getScaledIcon("data/sprites/spikes.png", iconSize); break;
+                case '&':   icon = tileIconManager.getScaledIcon("data/sprites/enemy.png", iconSize); break;
+                case 'E':   icon = tileIconManager.getScaledIcon("data/sprites/exit.png", iconSize); break;
+                default:    icon = QIcon();
+            }
+
+            item->setIcon(icon);
+            level->setItem(i, j, item);
+        }
+    }
+}
+
+
+QWidget* MainWindow::createActionButtons() {
+    QWidget* container = new QWidget;
+    QVBoxLayout* layout = new QVBoxLayout(container);
+
+    levelListWidget = new QListWidget;
+    layout->addWidget(new QLabel("Уровни:"));
+    layout->addWidget(levelListWidget, 1);
+
+    connect(levelListWidget, &QListWidget::itemClicked, this, [this](QListWidgetItem* item) {
+        QString levelData = item->data(Qt::UserRole).toString();
+        parseLevel(levelData);
+    });
+
+    QWidget* saveExportPanel = new QWidget;
+    QVBoxLayout* topButtonLayout = new QVBoxLayout(saveExportPanel);
+
+
+    QPushButton* saveButton = new QPushButton("Save level");
+    connect(saveButton, &QPushButton::clicked, this, &MainWindow::saveLevel);
+    topButtonLayout->addWidget(saveButton);
+
+    QPushButton* exportButton = new QPushButton("Export all files");
+    connect(exportButton, &QPushButton::clicked, this, &MainWindow::exportToFile);
+    topButtonLayout->addWidget(exportButton);
+
+    QPushButton* newButton = new QPushButton("New level");
+    connect(newButton, &QPushButton::clicked, this, &MainWindow::newLevel);
+    topButtonLayout->addWidget(newButton);
+
+    QPushButton* deleteButton = new QPushButton("Delete Level");
+    connect(deleteButton, &QPushButton::clicked, this, &MainWindow::deleteLevel);
+    topButtonLayout->addWidget(deleteButton);
+
+    layout->addWidget(saveExportPanel);
+
+    layout->addStretch();
+
+    layout->addItem(new QSpacerItem(20, 30, QSizePolicy::Minimum, QSizePolicy::Fixed));
+
+    QWidget* bottomPanel = new QWidget;
+    QVBoxLayout* bottomLayout = new QVBoxLayout(bottomPanel);
+
+    QPushButton* clearButton = new QPushButton("Clear level");
     connect(clearButton, &QPushButton::clicked, this, &MainWindow::clearLevel);
-    layout->addWidget(clearButton);
+    bottomLayout->addWidget(clearButton);
 
-    QPushButton* resizeButton = new QPushButton("Resize");
+    QPushButton* resizeButton = new QPushButton("Resize level");
     connect(resizeButton, &QPushButton::clicked, this, &MainWindow::openResizeDialog);
-    layout->addWidget(resizeButton);
+    bottomLayout->addWidget(resizeButton);
 
     QPushButton* undoButton = new QPushButton("Undo");
     connect(undoButton, &QPushButton::clicked, this, &MainWindow::undoTilePlacement);
-    layout->addWidget(undoButton);
+    bottomLayout->addWidget(undoButton);
 
-    QPushButton* exportButton = new QPushButton("Export");
-    connect(exportButton, &QPushButton::clicked, this, &MainWindow::exportToFile);
-    layout->addWidget(exportButton);
+    layout->addWidget(bottomPanel);
 
-    actionWidget->setLayout(layout);
-    return actionWidget;
+    QDir dir;
+    if (!dir.exists("data/saves")) {
+        dir.mkpath("data/saves");
+    }
+
+    loadLevelListFromFile("data/saves/levels.rll");
+
+    return container;
 }
+
+void MainWindow::loadLevelListFromFile(const QString& filePath) {
+
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qWarning() << "Cannot create level file:" << filePath;
+    }
+
+    QTextStream in(&file);
+    QString currentLevelName;
+    QStringList currentLevelData;
+
+    while (!in.atEnd()) {
+        QString line = in.readLine().trimmed();
+
+        if (line.startsWith("; Level")) {
+            if (!currentLevelName.isEmpty()) {
+                QListWidgetItem* item = new QListWidgetItem(currentLevelName);
+                item->setData(Qt::UserRole, currentLevelData.join("|"));
+                levelListWidget->addItem(item);
+                currentLevelData.clear();
+            }
+            currentLevelName = line.mid(2).trimmed();
+        } else if (!line.isEmpty()) {
+            currentLevelData << line;
+        }
+    }
+
+    if (!currentLevelName.isEmpty()) {
+        QListWidgetItem* item = new QListWidgetItem(currentLevelName);
+        item->setData(Qt::UserRole, currentLevelData.join("|"));
+        levelListWidget->addItem(item);
+    }
+}
+
 
 MainWindow::~MainWindow() { }
 
@@ -117,12 +236,30 @@ void MainWindow::keyPressEvent(QKeyEvent *event)
         return;
     }
 
+
+    if (event->modifiers() & Qt::ControlModifier && event->key() == Qt::Key_S) {
+        saveLevel();
+        event->accept();
+        return;
+    }
+
     if (event->modifiers() & Qt::ControlModifier && event->key() == Qt::Key_R) {
         openResizeDialog();
         event->accept();
         return;
     }
 
+    if (event->modifiers() & Qt::ControlModifier && event->key() == Qt::Key_N) {
+        newLevel();
+        event->accept();
+        return;
+    }
+
+    if (event->key() == Qt::Key_Delete) {
+        deleteLevel();
+        event->accept();
+        return;
+    }
 
     QMainWindow::keyPressEvent(event);
 }
@@ -152,7 +289,6 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
             }
         }
     }
-
     return QMainWindow::eventFilter(obj, event);
 }
 
@@ -197,7 +333,7 @@ void MainWindow::resizeEvent(QResizeEvent *event)
     int rows = level->rowCount();
     int columns = level->columnCount();
 
-    int cellSize = std::max(std::min(level->viewport()->width() / columns, level->viewport()->height() / rows), 20);
+    int cellSize = std::max(std::min(level->viewport()->width() / columns, level->viewport()->height() / rows), 25);
 
     for (int row = 0; row < rows; ++row)
         level->setRowHeight(row, cellSize);
@@ -316,7 +452,6 @@ QPushButton* MainWindow::createButton(const QIcon &icon, TileType  tileType, QTo
 }
 
 void MainWindow::clearLevel() {
-
     QMessageBox::StandardButton reply;
     reply = QMessageBox::question(this, "Clear Level", "Are you sure you want to clear the level?",
                                   QMessageBox::Yes | QMessageBox::No);
@@ -324,18 +459,25 @@ void MainWindow::clearLevel() {
     if (reply == QMessageBox::Yes) {
         int rows = level->rowCount();
         int columns = level->columnCount();
+        QSize iconSize = level->iconSize() * 0.95;
+        QIcon airIcon = tileIconManager.getScaledIcon("data/sprites/air.png", iconSize);
+
         for (int row = 0; row < rows; ++row) {
             for (int col = 0; col < columns; ++col) {
                 QTableWidgetItem* item = level->item(row, col);
-                if (item) {
-                    item->setIcon(QIcon());
-                    item->setData(Qt::UserRole, '-');
-                    item->setText("-");
+                if (!item) {
+                    item = new QTableWidgetItem();
+                    level->setItem(row, col, item);
                 }
+                item->setIcon(airIcon);
+                item->setData(Qt::UserRole, '-');
+                item->setText("-");
+                item->setForeground(Qt::transparent);
             }
         }
     }
 }
+
 
 void MainWindow::resizeLevel(int newWidth, int newHeight)
 {
@@ -353,6 +495,132 @@ void MainWindow::resizeLevel(int newWidth, int newHeight)
     QResizeEvent event(newSize, size());
     resizeEvent(&event);
 }
+
+void MainWindow::saveLevel() {
+    int rows = level->rowCount();
+    int cols = level->columnCount();
+    std::vector<char> data(rows * cols, '-');
+
+    for (int i = 0; i < rows; ++i) {
+        for (int j = 0; j < cols; ++j) {
+            QTableWidgetItem* item = level->item(i, j);
+            if (item) {
+                data[i * cols + j] = item->data(Qt::UserRole).toChar().toLatin1();
+            }
+        }
+    }
+
+    QString encryptedData;
+    encrypt(rows, cols, data, encryptedData);
+
+    QListWidgetItem* currentItem = levelListWidget->currentItem();
+
+    if (currentItem) {
+        currentItem->setData(Qt::UserRole, encryptedData);
+
+        QFile file("data/saves/levels.rll");
+        if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            QTextStream out(&file);
+
+            for (int i = 0; i < levelListWidget->count(); ++i) {
+                QListWidgetItem* item = levelListWidget->item(i);
+                QString levelName = item->text();
+                QString levelData = item->data(Qt::UserRole).toString();
+
+                out << "; " << levelName << "\n";
+                out << levelData << "\n";
+            }
+
+            file.close();
+        }
+    } else {
+        int nextIndex = levelListWidget->count() + 1;
+        QString levelName = QString("Level %1").arg(nextIndex);
+        QListWidgetItem* newItem = new QListWidgetItem(levelName);
+        newItem->setData(Qt::UserRole, encryptedData);
+        levelListWidget->addItem(newItem);
+        levelListWidget->setCurrentItem(newItem);
+
+        QFile file("data/saves/levels.rll");
+        if (file.open(QIODevice::Append | QIODevice::Text)) {
+            QTextStream out(&file);
+            out << "\n; " << levelName << "\n";
+            out << encryptedData << "\n";
+            file.close();
+        }
+    }
+
+}
+
+void MainWindow::newLevel() {
+    int rows = level->rowCount();
+    int cols = level->columnCount();
+
+    int maxNumber = 0;
+    for (int i = 0; i < levelListWidget->count(); ++i) {
+        QListWidgetItem* item = levelListWidget->item(i);
+        QString text = item->text();
+        QRegularExpression re("Level (\\d+)");
+        QRegularExpressionMatch match = re.match(text);
+        if (match.hasMatch()) {
+            int num = match.captured(1).toInt();
+            maxNumber = std::max(maxNumber, num);
+        }
+    }
+
+    int newLevelNumber = maxNumber + 1;
+    QString newLevelName = QString("Level %1").arg(newLevelNumber);
+
+    std::vector<char> emptyData(rows * cols, '-');
+    QString encrypted;
+    encrypt(rows, cols, emptyData, encrypted);
+
+    QListWidgetItem* newItem = new QListWidgetItem(newLevelName);
+    newItem->setData(Qt::UserRole, encrypted);
+    levelListWidget->addItem(newItem);
+
+    levelListWidget->setCurrentItem(newItem);
+    parseLevel(encrypted);
+}
+
+void MainWindow::deleteLevel() {
+    QListWidgetItem* selectedItem = levelListWidget->currentItem();
+    if (!selectedItem) {
+        QMessageBox::information(this, "Info", "No level selected to delete.");
+        return;
+    }
+
+    QMessageBox::StandardButton reply;
+    reply = QMessageBox::question(this, "Delete Level", "Are you sure you want to delete this level?",
+                                  QMessageBox::Yes | QMessageBox::No);
+
+    if (reply == QMessageBox::No) {
+        return;
+    }
+
+    int row = levelListWidget->row(selectedItem);
+    QString levelName = selectedItem->text();
+
+    delete levelListWidget->takeItem(row);
+
+    QFile file("data/saves/levels.rll");
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
+        QMessageBox::warning(this, "Error", "Unable to update file.");
+        return;
+    }
+
+    QTextStream out(&file);
+    for (int i = 0; i < levelListWidget->count(); ++i) {
+        QListWidgetItem* item = levelListWidget->item(i);
+        out << "\n; Level " << (i + 1) << "\n";
+        out << item->data(Qt::UserRole).toString() << "\n";
+        item->setText(QString("Level %1").arg(i + 1));
+    }
+
+    file.close();
+}
+
+
 
 void MainWindow::exportToFile() {
     QString filePath = QFileDialog::getSaveFileName(
@@ -373,22 +641,26 @@ void MainWindow::exportToFile() {
     QTextStream out(&file);
 
     int rows = level->rowCount();
-    int cols = level->columnCount();
-    std::vector<char> data(rows * cols, '-');
+    int columns = level->columnCount();
+    std::vector<char> data(rows * columns, '-');
 
     for (int i = 0; i < rows; ++i) {
-        for (int j = 0; j < cols; ++j) {
+        for (int j = 0; j < columns; ++j) {
             QTableWidgetItem *item = level->item(i, j);
             if (item) {
-                data[i * cols + j] = item->text().toStdString()[0];
+                data[i * columns + j] = item->text().toStdString()[0];
             }
         }
     }
     QString encryptedData;
-    encrypt(rows, cols, data, encryptedData);
+    encrypt(rows, columns, data, encryptedData);
 
     out << encryptedData;
 
 
     file.close();
 }
+
+// todo separate parts in different files
+// todo add sounds
+// todo player spawn logic here and in proj1
