@@ -8,5 +8,5 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets)
 qt_standard_project_setup()
 
 qt_add_executable(level-editor main.cpp main_window.h main_window.cpp
-                  utilities.h tile_icon_manager.h)
+                  utilities.h tile_icon_manager.h direction_input_widget.h)
 target_link_libraries(level-editor PRIVATE Qt6::Widgets)

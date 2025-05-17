@@ -20,8 +20,8 @@ MainWindow::MainWindow(QWidget *parent)
     level->horizontalHeader()->setMinimumSectionSize(32);
     level->verticalHeader()->setMaximumSectionSize(300);
     level->horizontalHeader()->setMaximumSectionSize(300);
-    level->verticalHeader()->hide();
-    level->horizontalHeader()->hide();
+    //level->verticalHeader()->hide();
+    //level->horizontalHeader()->hide();
     level->setEditTriggers(QAbstractItemView::NoEditTriggers);
     level->setSelectionMode(QAbstractItemView::NoSelection);
     level->setSelectionBehavior(QAbstractItemView::SelectItems);
@@ -51,14 +51,20 @@ MainWindow::MainWindow(QWidget *parent)
     addTileButton(TileType::Wall,     "data/sprites/wall.png");
     addTileButton(TileType::DarkWall, "data/sprites/wall_dark.png");
     addTileButton(TileType::Coin,     "data/sprites/coin.png");
-    addTileButton(TileType::Player,   "data/sprites/player.png");
     addTileButton(TileType::Spikes,   "data/sprites/spikes.png");
     addTileButton(TileType::Enemy,    "data/sprites/enemy.png");
     addTileButton(TileType::Exit,     "data/sprites/exit.png");
+    addTileButton(TileType::PlayerLeft,"data/sprites/player_left.png");
+    addTileButton(TileType::PlayerRight,"data/sprites/player_right.png");
+    addTileButton(TileType::PlayerUp, "data/sprites/player_up.png");
+    addTileButton(TileType::PlayerDown,"data/sprites/player_down.png");
 
     tileIconManager.updateButtonStyles(selectedTile);
 
     mainLayout->addWidget(buttonLayout);
+
+    dirWidget = new DirectionInputWidget(this);
+    mainLayout->addWidget(dirWidget);
 
     QDockWidget* dockWidget = new QDockWidget("Actions", this);
     dockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
@@ -76,10 +82,13 @@ void MainWindow::parseLevel(const QString& encryptedData) {
     int rows, cols;
     std::vector<char> data;
 
-    if (!decrypt(encryptedData, rows, cols, data)) {
+    dirWidget->getValues(next_level);
+    if (!decrypt(encryptedData, rows, cols, next_level, data)) {
         QMessageBox::warning(this, "Error", "Can't decode level");
         return;
     }
+
+    dirWidget->setNextLevel(next_level);
 
     level->setRowCount(rows);
     level->setColumnCount(cols);
@@ -95,14 +104,17 @@ void MainWindow::parseLevel(const QString& encryptedData) {
 
             QIcon icon;
             switch (ch.toLatin1()) {
-                case ' ':   icon = tileIconManager.getScaledIcon("data/sprites/air.png", iconSize); break;
+                case '-':   icon = tileIconManager.getScaledIcon("data/sprites/air.png", iconSize); break;
                 case '#':   icon = tileIconManager.getScaledIcon("data/sprites/wall.png", iconSize); break;
                 case '=':   icon = tileIconManager.getScaledIcon("data/sprites/wall_dark.png", iconSize); break;
                 case '*':   icon = tileIconManager.getScaledIcon("data/sprites/coin.png", iconSize); break;
-                case '@':   icon = tileIconManager.getScaledIcon("data/sprites/player.png", iconSize); break;
                 case '^':   icon = tileIconManager.getScaledIcon("data/sprites/spikes.png", iconSize); break;
                 case '&':   icon = tileIconManager.getScaledIcon("data/sprites/enemy.png", iconSize); break;
                 case 'E':   icon = tileIconManager.getScaledIcon("data/sprites/exit.png", iconSize); break;
+                case 'L':   icon = tileIconManager.getScaledIcon("data/sprites/player_left.png", iconSize); break;
+                case 'R':   icon = tileIconManager.getScaledIcon("data/sprites/player_right.png", iconSize); break;
+                case 'U':   icon = tileIconManager.getScaledIcon("data/sprites/player_up.png", iconSize); break;
+                case 'D':   icon = tileIconManager.getScaledIcon("data/sprites/player_down.png", iconSize); break;
                 default:    icon = QIcon();
             }
 
@@ -354,10 +366,13 @@ void MainWindow::selectTile(char tile) {
         case '*': selectedTile = TileType::Coin; break;
         case '&': selectedTile = TileType::Enemy; break;
         case 'E': selectedTile = TileType::Exit; break;
-        case '@': selectedTile = TileType::Player; break;
         case '^': selectedTile = TileType::Spikes; break;
         case '#': selectedTile = TileType::Wall; break;
         case '=': selectedTile = TileType::DarkWall; break;
+        case 'L': selectedTile = TileType::PlayerLeft; break;
+        case 'R': selectedTile = TileType::PlayerRight; break;
+        case 'U': selectedTile = TileType::PlayerUp; break;
+        case 'D': selectedTile = TileType::PlayerDown; break;
         default: selectedTile = TileType::Air; break;
     }
 }
@@ -374,14 +389,17 @@ void MainWindow::onTileClicked(int row, int col)
     char targetChar = '-';
 
     switch (selectedTile) {
-        case TileType::Air:     targetChar = ' '; break;
-        case TileType::Wall:    targetChar = '#'; break;
-        case TileType::DarkWall:targetChar = '='; break;
-        case TileType::Coin:    targetChar = '*'; break;
-        case TileType::Player:  targetChar = '@'; break;
-        case TileType::Spikes:  targetChar = '^'; break;
-        case TileType::Enemy:   targetChar = '&'; break;
-        case TileType::Exit:    targetChar = 'E'; break;
+        case TileType::Air:        targetChar = '-'; break;
+        case TileType::Wall:       targetChar = '#'; break;
+        case TileType::DarkWall:   targetChar = '='; break;
+        case TileType::Coin:       targetChar = '*'; break;
+        case TileType::Spikes:     targetChar = '^'; break;
+        case TileType::Enemy:      targetChar = '&'; break;
+        case TileType::Exit:       targetChar = 'E'; break;
+        case TileType::PlayerLeft: targetChar = 'L'; break;
+        case TileType::PlayerRight:targetChar = 'R'; break;
+        case TileType::PlayerUp:   targetChar = 'U'; break;
+        case TileType::PlayerDown: targetChar = 'D'; break;
     }
 
     if (currentChar == targetChar) {
@@ -402,14 +420,17 @@ void MainWindow::onTileClicked(int row, int col)
     QSize iconSize = level->iconSize() * 0.95;
     QIcon icon;
     switch (selectedTile) {
-        case TileType::Air:     icon = tileIconManager.getScaledIcon("data/sprites/air.png", iconSize); break;
-        case TileType::Wall:    icon = tileIconManager.getScaledIcon("data/sprites/wall.png", iconSize); break;
-        case TileType::DarkWall:icon = tileIconManager.getScaledIcon("data/sprites/wall_dark.png", iconSize); break;
-        case TileType::Coin:    icon = tileIconManager.getScaledIcon("data/sprites/coin.png", iconSize); break;
-        case TileType::Player:  icon = tileIconManager.getScaledIcon("data/sprites/player.png", iconSize); break;
-        case TileType::Spikes:  icon = tileIconManager.getScaledIcon("data/sprites/spikes.png", iconSize); break;
-        case TileType::Enemy:   icon = tileIconManager.getScaledIcon("data/sprites/enemy.png", iconSize); break;
-        case TileType::Exit:    icon = tileIconManager.getScaledIcon("data/sprites/exit.png", iconSize); break;
+        case TileType::Air:        icon = tileIconManager.getScaledIcon("data/sprites/air.png", iconSize); break;
+        case TileType::Wall:       icon = tileIconManager.getScaledIcon("data/sprites/wall.png", iconSize); break;
+        case TileType::DarkWall:   icon = tileIconManager.getScaledIcon("data/sprites/wall_dark.png", iconSize); break;
+        case TileType::Coin:       icon = tileIconManager.getScaledIcon("data/sprites/coin.png", iconSize); break;
+        case TileType::Spikes:     icon = tileIconManager.getScaledIcon("data/sprites/spikes.png", iconSize); break;
+        case TileType::Enemy:      icon = tileIconManager.getScaledIcon("data/sprites/enemy.png", iconSize); break;
+        case TileType::Exit:       icon = tileIconManager.getScaledIcon("data/sprites/exit.png", iconSize); break;
+        case TileType::PlayerLeft: icon = tileIconManager.getScaledIcon("data/sprites/player_left.png", iconSize); break;
+        case TileType::PlayerRight:icon = tileIconManager.getScaledIcon("data/sprites/player_right.png", iconSize); break;
+        case TileType::PlayerUp:   icon = tileIconManager.getScaledIcon("data/sprites/player_up.png", iconSize); break;
+        case TileType::PlayerDown: icon = tileIconManager.getScaledIcon("data/sprites/player_down.png", iconSize); break;
     }
 
     item->setIcon(icon);
@@ -505,13 +526,22 @@ void MainWindow::saveLevel() {
         for (int j = 0; j < cols; ++j) {
             QTableWidgetItem* item = level->item(i, j);
             if (item) {
-                data[i * cols + j] = item->data(Qt::UserRole).toChar().toLatin1();
+                QVariant var = item->data(Qt::UserRole);
+                char symbol = '-';
+                if (var.isValid() && !var.isNull()) {
+                    QChar ch = var.toChar();
+                    if (!ch.isNull()) {
+                        symbol = ch.toLatin1();
+                    }
+                }
+                data[i * cols + j] = symbol;
             }
         }
     }
-
+// todo saves only new changes
     QString encryptedData;
-    encrypt(rows, cols, data, encryptedData);
+    dirWidget->getValues(next_level);
+    encrypt(rows, cols, data, next_level, encryptedData);
 
     QListWidgetItem* currentItem = levelListWidget->currentItem();
 
@@ -549,7 +579,6 @@ void MainWindow::saveLevel() {
             file.close();
         }
     }
-
 }
 
 void MainWindow::newLevel() {
@@ -573,13 +602,16 @@ void MainWindow::newLevel() {
 
     std::vector<char> emptyData(rows * cols, '-');
     QString encrypted;
-    encrypt(rows, cols, emptyData, encrypted);
+    dirWidget->getValues(next_level);
+    encrypt(rows, cols, emptyData, next_level, encrypted);
 
     QListWidgetItem* newItem = new QListWidgetItem(newLevelName);
     newItem->setData(Qt::UserRole, encrypted);
     levelListWidget->addItem(newItem);
 
     levelListWidget->setCurrentItem(newItem);
+
+    for (int & i : next_level) i = 0;
     parseLevel(encrypted);
 }
 
@@ -653,7 +685,8 @@ void MainWindow::exportToFile() {
         }
     }
     QString encryptedData;
-    encrypt(rows, columns, data, encryptedData);
+    dirWidget->getValues(next_level);
+    encrypt(rows, columns, data, next_level, encryptedData);
 
     out << encryptedData;
 
@@ -662,5 +695,3 @@ void MainWindow::exportToFile() {
 }
 
 // todo separate parts in different files
-// todo add sounds
-// todo player spawn logic here and in proj1

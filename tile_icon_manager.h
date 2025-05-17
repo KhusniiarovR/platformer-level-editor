@@ -12,10 +12,13 @@ enum class TileType {
     Wall,
     DarkWall,
     Coin,
-    Player,
     Spikes,
     Enemy,
-    Exit
+    Exit,
+    PlayerLeft,
+    PlayerRight,
+    PlayerUp,
+    PlayerDown
 };
 
 class TileIconManager

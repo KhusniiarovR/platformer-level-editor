@@ -3,6 +3,7 @@
 
 #include <QtWidgets>
 #include "tile_icon_manager.h"
+#include "direction_input_widget.h"
 
 
 class MainWindow : public QMainWindow
@@ -10,6 +11,8 @@ class MainWindow : public QMainWindow
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
+
+    int next_level[4] = {0, 0, 0, 0};
 
 protected:
     void keyPressEvent(QKeyEvent *event) override;
@@ -54,6 +57,8 @@ private:
     void loadLevelListFromFile(const QString& path);
     void parseLevel(const QString& levelString);
     void saveLevel();
+
+    DirectionInputWidget *dirWidget;
 };
 
 #endif // MAIN_WINDOW_H
