@@ -118,6 +118,7 @@ void MainWindow::parseLevel(const QString& encryptedData) {
                 default:    icon = QIcon();
             }
 
+            item->setData(Qt::UserRole, ch);
             item->setIcon(icon);
             level->setItem(i, j, item);
         }
@@ -130,7 +131,7 @@ QWidget* MainWindow::createActionButtons() {
     QVBoxLayout* layout = new QVBoxLayout(container);
 
     levelListWidget = new QListWidget;
-    layout->addWidget(new QLabel("Уровни:"));
+    layout->addWidget(new QLabel("Levels:"));
     layout->addWidget(levelListWidget, 1);
 
     connect(levelListWidget, &QListWidget::itemClicked, this, [this](QListWidgetItem* item) {
