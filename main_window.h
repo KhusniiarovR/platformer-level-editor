@@ -50,8 +50,6 @@ private:
     void openResizeDialog();
 
     bool isDrawing = false;
-    int lastRow = -1;
-    int lastCol = -1;
 
     QListWidget* levelListWidget;
     void loadLevelListFromFile(const QString& path);

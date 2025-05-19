@@ -14,11 +14,12 @@ enum class TileType {
     Coin,
     Spikes,
     Enemy,
-    Exit,
     PlayerLeft,
     PlayerRight,
     PlayerUp,
-    PlayerDown
+    PlayerDown,
+    Platform,
+    Spring
 };
 
 class TileIconManager

@@ -8,8 +8,6 @@
 
 class DirectionInputWidget : public QWidget
 {
-    Q_OBJECT
-
 public:
     explicit DirectionInputWidget(QWidget *parent)
     : QWidget(parent)
@@ -21,7 +19,7 @@ public:
 
         // Optional: Only allow digits
         for (QLineEdit *edit : {leftEdit, rightEdit, upEdit, downEdit}) {
-            edit->setValidator(new QIntValidator(-1, 9999, this));
+            edit->setValidator(new QIntValidator(-2, 9999, this));
         }
 
         QFormLayout *layout = new QFormLayout;

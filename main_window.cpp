@@ -53,11 +53,12 @@ MainWindow::MainWindow(QWidget *parent)
     addTileButton(TileType::Coin,     "data/sprites/coin.png");
     addTileButton(TileType::Spikes,   "data/sprites/spikes.png");
     addTileButton(TileType::Enemy,    "data/sprites/enemy.png");
-    addTileButton(TileType::Exit,     "data/sprites/exit.png");
     addTileButton(TileType::PlayerLeft,"data/sprites/player_left.png");
     addTileButton(TileType::PlayerRight,"data/sprites/player_right.png");
     addTileButton(TileType::PlayerUp, "data/sprites/player_up.png");
     addTileButton(TileType::PlayerDown,"data/sprites/player_down.png");
+    addTileButton(TileType::Platform,"data/sprites/platform.png");
+    addTileButton(TileType::Spring,     "data/sprites/spring.png");
 
     tileIconManager.updateButtonStyles(selectedTile);
 
@@ -115,6 +116,8 @@ void MainWindow::parseLevel(const QString& encryptedData) {
                 case 'R':   icon = tileIconManager.getScaledIcon("data/sprites/player_right.png", iconSize); break;
                 case 'U':   icon = tileIconManager.getScaledIcon("data/sprites/player_up.png", iconSize); break;
                 case 'D':   icon = tileIconManager.getScaledIcon("data/sprites/player_down.png", iconSize); break;
+                case 'P':   icon = tileIconManager.getScaledIcon("data/sprites/platform.png", iconSize); break;
+                case 'S':   icon = tileIconManager.getScaledIcon("data/sprites/spring.png", iconSize); break;
                 default:    icon = QIcon();
             }
 
@@ -366,7 +369,6 @@ void MainWindow::selectTile(char tile) {
     switch (tile) {
         case '*': selectedTile = TileType::Coin; break;
         case '&': selectedTile = TileType::Enemy; break;
-        case 'E': selectedTile = TileType::Exit; break;
         case '^': selectedTile = TileType::Spikes; break;
         case '#': selectedTile = TileType::Wall; break;
         case '=': selectedTile = TileType::DarkWall; break;
@@ -374,6 +376,8 @@ void MainWindow::selectTile(char tile) {
         case 'R': selectedTile = TileType::PlayerRight; break;
         case 'U': selectedTile = TileType::PlayerUp; break;
         case 'D': selectedTile = TileType::PlayerDown; break;
+        case 'P': selectedTile = TileType::Platform; break;
+        case 'S': selectedTile = TileType::Spring; break;
         default: selectedTile = TileType::Air; break;
     }
 }
@@ -396,11 +400,12 @@ void MainWindow::onTileClicked(int row, int col)
         case TileType::Coin:       targetChar = '*'; break;
         case TileType::Spikes:     targetChar = '^'; break;
         case TileType::Enemy:      targetChar = '&'; break;
-        case TileType::Exit:       targetChar = 'E'; break;
         case TileType::PlayerLeft: targetChar = 'L'; break;
         case TileType::PlayerRight:targetChar = 'R'; break;
         case TileType::PlayerUp:   targetChar = 'U'; break;
         case TileType::PlayerDown: targetChar = 'D'; break;
+        case TileType::Platform: targetChar = 'P'; break;
+        case TileType::Spring:       targetChar = 'S'; break;
     }
 
     if (currentChar == targetChar) {
@@ -427,11 +432,12 @@ void MainWindow::onTileClicked(int row, int col)
         case TileType::Coin:       icon = tileIconManager.getScaledIcon("data/sprites/coin.png", iconSize); break;
         case TileType::Spikes:     icon = tileIconManager.getScaledIcon("data/sprites/spikes.png", iconSize); break;
         case TileType::Enemy:      icon = tileIconManager.getScaledIcon("data/sprites/enemy.png", iconSize); break;
-        case TileType::Exit:       icon = tileIconManager.getScaledIcon("data/sprites/exit.png", iconSize); break;
         case TileType::PlayerLeft: icon = tileIconManager.getScaledIcon("data/sprites/player_left.png", iconSize); break;
         case TileType::PlayerRight:icon = tileIconManager.getScaledIcon("data/sprites/player_right.png", iconSize); break;
         case TileType::PlayerUp:   icon = tileIconManager.getScaledIcon("data/sprites/player_up.png", iconSize); break;
         case TileType::PlayerDown: icon = tileIconManager.getScaledIcon("data/sprites/player_down.png", iconSize); break;
+        case TileType::Platform:   icon = tileIconManager.getScaledIcon("data/sprites/platform.png", iconSize); break;
+        case TileType::Spring:     icon = tileIconManager.getScaledIcon("data/sprites/spring.png", iconSize); break;
     }
 
     item->setIcon(icon);
@@ -653,46 +659,49 @@ void MainWindow::deleteLevel() {
     file.close();
 }
 
-
-
 void MainWindow::exportToFile() {
-    QString filePath = QFileDialog::getSaveFileName(
+    QString sourcePath = QFileDialog::getOpenFileName(
         this,
-        "Export Level",
-        "data/saves",
+        "Select Level File to Export",
+        QDir::currentPath() + "/data/saves",
         "RLL Files (*.rll);;All Files (*)"
     );
 
-    if (filePath.isEmpty()) return;
-
-    QFile file(filePath);
-    if (!file.open(QIODevice::WriteOnly)) {
-        QMessageBox::warning(this, "Error", "Unable to open file for saving.");
+    if (sourcePath.isEmpty() || !QFile::exists(sourcePath)) {
+        QMessageBox::warning(this, "Error", "Source file does not exist.");
         return;
     }
 
-    QTextStream out(&file);
+    QString targetDir = QFileDialog::getExistingDirectory(
+        this,
+        "Select Target Directory",
+        QDir::currentPath() + "/data/saves"
+    );
 
-    int rows = level->rowCount();
-    int columns = level->columnCount();
-    std::vector<char> data(rows * columns, '-');
+    if (targetDir.isEmpty()) return;
 
-    for (int i = 0; i < rows; ++i) {
-        for (int j = 0; j < columns; ++j) {
-            QTableWidgetItem *item = level->item(i, j);
-            if (item) {
-                data[i * columns + j] = item->text().toStdString()[0];
-            }
-        }
+    QFileInfo fileInfo(sourcePath);
+    QString fileName = fileInfo.fileName();
+    QString destinationPath = QDir(targetDir).filePath(fileName);
+
+    if (QFile::exists(destinationPath)) {
+        auto reply = QMessageBox::question(
+            this, "Overwrite?",
+            "File already exists in target directory. Overwrite?",
+            QMessageBox::Yes | QMessageBox::No
+        );
+        if (reply != QMessageBox::Yes) return;
+
+        QFile::remove(destinationPath);
     }
-    QString encryptedData;
-    dirWidget->getValues(next_level);
-    encrypt(rows, columns, data, next_level, encryptedData);
 
-    out << encryptedData;
-
-
-    file.close();
+    // Копирование
+    if (!QFile::copy(sourcePath, destinationPath)) {
+        QMessageBox::critical(this, "Error", "Failed to copy the file.");
+    } else {
+        QMessageBox::information(this, "Success", "File exported successfully to:\n" + destinationPath);
+    }
 }
+
 
 // todo separate parts in different files
