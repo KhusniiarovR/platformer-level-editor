@@ -150,7 +150,11 @@ QWidget* MainWindow::createActionButtons() {
     connect(saveButton, &QPushButton::clicked, this, &MainWindow::saveLevel);
     topButtonLayout->addWidget(saveButton);
 
-    QPushButton* exportButton = new QPushButton("Export all files");
+    QPushButton* importButton = new QPushButton("Import");
+    connect(importButton, &QPushButton::clicked, this, &MainWindow::importFromFile);
+    topButtonLayout->addWidget(importButton);
+
+    QPushButton* exportButton = new QPushButton("Export");
     connect(exportButton, &QPushButton::clicked, this, &MainWindow::exportToFile);
     topButtonLayout->addWidget(exportButton);
 
@@ -252,6 +256,11 @@ void MainWindow::keyPressEvent(QKeyEvent *event)
         return;
     }
 
+    if (event->modifiers() & Qt::ControlModifier && event->key() == Qt::Key_I) {
+        importFromFile();
+        event->accept();
+        return;
+    }
 
     if (event->modifiers() & Qt::ControlModifier && event->key() == Qt::Key_S) {
         saveLevel();
@@ -545,7 +554,6 @@ void MainWindow::saveLevel() {
             }
         }
     }
-// todo saves only new changes
     QString encryptedData;
     dirWidget->getValues(next_level);
     encrypt(rows, cols, data, next_level, encryptedData);
@@ -659,23 +667,62 @@ void MainWindow::deleteLevel() {
     file.close();
 }
 
-void MainWindow::exportToFile() {
+void MainWindow::importFromFile() {
     QString sourcePath = QFileDialog::getOpenFileName(
         this,
-        "Select Level File to Export",
-        QDir::currentPath() + "/data/saves",
+        "Select File to Import",
+        QDir::homePath(),
         "RLL Files (*.rll);;All Files (*)"
     );
 
     if (sourcePath.isEmpty() || !QFile::exists(sourcePath)) {
-        QMessageBox::warning(this, "Error", "Source file does not exist.");
+        QMessageBox::warning(this, "Error", "Selected file does not exist.");
+        return;
+    }
+
+    QFileInfo fileInfo(sourcePath);
+    QString fileName = fileInfo.fileName();
+    QString destinationDir = QDir::currentPath() + "/data/saves";
+    QString destinationPath = QDir(destinationDir).filePath(fileName);
+
+    if (QFile::exists(destinationPath)) {
+        auto reply = QMessageBox::question(
+            this, "Overwrite?",
+            "File already exists in data/saves/. Overwrite?",
+            QMessageBox::Yes | QMessageBox::No
+        );
+        if (reply != QMessageBox::Yes) return;
+
+        QFile::remove(destinationPath);
+    }
+
+    if (!QFile::copy(sourcePath, destinationPath)) {
+        QMessageBox::critical(this, "Error", "Failed to import the file.");
+    } else {
+        QMessageBox::information(this, "Success", "File imported successfully to:\n" + destinationPath);
+    }
+    loadLevelListFromFile("data/saves/levels.rll");
+}
+
+void MainWindow::exportToFile() {
+    QString sourceDir = QDir::currentPath() + "/data/saves";
+
+    QString sourcePath = QFileDialog::getOpenFileName(
+        this,
+        "Select File to Export from data/saves",
+        sourceDir,
+        "RLL Files (*.rll);;All Files (*)"
+    );
+
+    if (sourcePath.isEmpty() || !QFile::exists(sourcePath)) {
+        QMessageBox::warning(this, "Error", "Selected file does not exist.");
         return;
     }
 
     QString targetDir = QFileDialog::getExistingDirectory(
         this,
         "Select Target Directory",
-        QDir::currentPath() + "/data/saves"
+        QDir::homePath()
     );
 
     if (targetDir.isEmpty()) return;
@@ -687,7 +734,7 @@ void MainWindow::exportToFile() {
     if (QFile::exists(destinationPath)) {
         auto reply = QMessageBox::question(
             this, "Overwrite?",
-            "File already exists in target directory. Overwrite?",
+            "File already exists in the target directory. Overwrite?",
             QMessageBox::Yes | QMessageBox::No
         );
         if (reply != QMessageBox::Yes) return;
@@ -695,13 +742,9 @@ void MainWindow::exportToFile() {
         QFile::remove(destinationPath);
     }
 
-    // Копирование
     if (!QFile::copy(sourcePath, destinationPath)) {
-        QMessageBox::critical(this, "Error", "Failed to copy the file.");
+        QMessageBox::critical(this, "Error", "Failed to export the file.");
     } else {
         QMessageBox::information(this, "Success", "File exported successfully to:\n" + destinationPath);
     }
 }
-
-
-// todo separate parts in different files

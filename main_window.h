@@ -28,6 +28,7 @@ private:
     void resizeLevel(int newWidth, int newHeight);
     void newLevel();
     void deleteLevel();
+    void importFromFile();
     void exportToFile();
 
     struct TileAction {
@@ -44,9 +45,10 @@ private:
 
     QTableWidget *level;
     QToolBar *buttonLayout;
-
     TileIconManager tileIconManager;
+
     QWidget* createActionButtons();
+
     void openResizeDialog();
 
     bool isDrawing = false;
