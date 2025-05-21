@@ -1,11 +1,10 @@
-#ifndef TILE_ICON_MANAGER_H
-#define TILE_ICON_MANAGER_H
+#ifndef TILEICONMANAGER_H
+#define TILEICONMANAGER_H
 
 #include <QMap>
 #include <QPushButton>
 #include <QIcon>
 #include <QString>
-#include <QSize>
 
 enum class TileType {
     Air,
@@ -25,7 +24,8 @@ enum class TileType {
 class TileIconManager
 {
 public:
-    TileIconManager() {}
+    TileIconManager() = default;
+    ~TileIconManager() = default;
 
     void registerButton(TileType type, const QString& path, QPushButton* button) {
         iconPaths[type] = path;
@@ -43,27 +43,16 @@ public:
         }
     }
 
-    QIcon getScaledIcon(const QString& path, const QSize& size) {
-        if (path.isEmpty()) return QIcon();
+    static QIcon getScaledIcon(const QString& path, const QSize& size) {
+        if (path.isEmpty()) return {};
         QPixmap pixmap(path);
-        if (pixmap.isNull()) return QIcon();
-        return QIcon(pixmap.scaled(size, Qt::KeepAspectRatio, Qt::FastTransformation));
+        if (pixmap.isNull()) return {};
+        return {pixmap.scaled(size, Qt::KeepAspectRatio, Qt::FastTransformation)};
     }
 
-    QString getPath(TileType type) const {
-        return iconPaths.value(type, "");
-    }
-
-    void updateButtonStyles(TileType selectedTile)
-    {
-        for (auto button : buttons) {
-            button->setStyleSheet("");
-        }
-
-        QPushButton* activeButton = buttons[selectedTile];
-        if (activeButton) {
-            activeButton->setStyleSheet("background-color: yellow;");
-        }
+    void updateButtonStyles(const TileType selectedTile) {
+        for (const auto button : buttons) button->setStyleSheet("");
+        if (QPushButton* activeButton = buttons[selectedTile]) activeButton->setStyleSheet("background-color: yellow;");
     }
 
 private:
@@ -71,4 +60,4 @@ private:
     QMap<TileType, QPushButton*> buttons;
 };
 
-#endif // TILE_ICON_MANAGER_H
+#endif // TILEICONMANAGER_H

@@ -2,16 +2,14 @@
 #define MAIN_WINDOW_H
 
 #include <QtWidgets>
-#include "tile_icon_manager.h"
-#include "direction_input_widget.h"
-
+#include "TileIconManager.h"
+#include "DirectionInputWidget.h"
 
 class MainWindow : public QMainWindow
 {
 public:
-    MainWindow(QWidget *parent = nullptr);
-    ~MainWindow();
-
+    explicit MainWindow(QWidget *parent = nullptr);
+    ~MainWindow() override = default;
     int next_level[4] = {0, 0, 0, 0};
 
 protected:
@@ -20,44 +18,38 @@ protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
 
 private:
-    void selectTile(char tile);
     void onTileClicked(int row, int col);
-    void undoTilePlacement();
 
-    void clearLevel();
-    void resizeLevel(int newWidth, int newHeight);
+    void saveLevel();
     void newLevel();
     void deleteLevel();
     void importFromFile();
     void exportToFile();
+    void clearLevel();
+    void resizeLevel(int newWidth, int newHeight);
+    void undoTilePlacement();
+
+    QWidget* createActionButtons();
+    void openResizeDialog();
+    void parseLevel(const QString& levelString);
+    void loadLevelListFromFile(const QString& path) const;
 
     struct TileAction {
         int row;
         int col;
         QIcon previousIcon;
-        char previousData;
+        QVariant previousData;
         bool isEmpty;
     };
 
     QStack<TileAction> undoStack;
     TileType selectedTile;
-    QPushButton* createButton(const QIcon &icon, TileType  tileType, QToolBar* layout);
+    bool isDrawing = false;
 
     QTableWidget *level;
     QToolBar *buttonLayout;
     TileIconManager tileIconManager;
-
-    QWidget* createActionButtons();
-
-    void openResizeDialog();
-
-    bool isDrawing = false;
-
     QListWidget* levelListWidget;
-    void loadLevelListFromFile(const QString& path);
-    void parseLevel(const QString& levelString);
-    void saveLevel();
-
     DirectionInputWidget *dirWidget;
 };
 
