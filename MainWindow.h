@@ -25,12 +25,13 @@ private:
     void deleteLevel();
     void importFromFile();
     void exportToFile();
+    void helpDialog();
     void clearLevel();
     void resizeLevel(int newWidth, int newHeight);
     void undoTilePlacement();
 
     QWidget* createActionButtons();
-    void openResizeDialog();
+    void resizeDialog();
     void parseLevel(const QString& levelString);
     void loadLevelListFromFile(const QString& path) const;
 

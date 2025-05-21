@@ -69,28 +69,8 @@ MainWindow::MainWindow(QWidget *parent)
 }
 
 void MainWindow::keyPressEvent(QKeyEvent *event) {
-    if (event->modifiers() & Qt::ControlModifier && event->key() == Qt::Key_Z) {
-        undoTilePlacement();
-        event->accept();
-        return;}
-    if (event->modifiers() & Qt::ControlModifier && event->key() == Qt::Key_C) {
-        clearLevel();
-        event->accept();
-        return;}
-    if (event->modifiers() & Qt::ControlModifier && event->key() == Qt::Key_E) {
-        exportToFile();
-        event->accept();
-        return;}
-    if (event->modifiers() & Qt::ControlModifier && event->key() == Qt::Key_I) {
-        importFromFile();
-        event->accept();
-        return;}
     if (event->modifiers() & Qt::ControlModifier && event->key() == Qt::Key_S) {
         saveLevel();
-        event->accept();
-        return;}
-    if (event->modifiers() & Qt::ControlModifier && event->key() == Qt::Key_R) {
-        openResizeDialog();
         event->accept();
         return;}
     if (event->modifiers() & Qt::ControlModifier && event->key() == Qt::Key_N) {
@@ -99,6 +79,30 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
         return;}
     if (event->key() == Qt::Key_Delete) {
         deleteLevel();
+        event->accept();
+        return;}
+    if (event->modifiers() & Qt::ControlModifier && event->key() == Qt::Key_I) {
+        importFromFile();
+        event->accept();
+        return;}
+    if (event->modifiers() & Qt::ControlModifier && event->key() == Qt::Key_E) {
+        exportToFile();
+        event->accept();
+        return;}
+    if (event->modifiers() & Qt::ControlModifier && event->key() == Qt::Key_H) {
+        helpDialog();
+        event->accept();
+        return;}
+    if (event->modifiers() & Qt::ControlModifier && event->key() == Qt::Key_C) {
+        clearLevel();
+        event->accept();
+        return;}
+    if (event->modifiers() & Qt::ControlModifier && event->key() == Qt::Key_R) {
+        resizeDialog();
+        event->accept();
+        return;}
+    if (event->modifiers() & Qt::ControlModifier && event->key() == Qt::Key_Z) {
+        undoTilePlacement();
         event->accept();
         return;}
     QMainWindow::keyPressEvent(event);
@@ -363,6 +367,28 @@ void MainWindow::exportToFile() {
     else QMessageBox::information(this, "Success", "File exported successfully to:\n" + destinationPath);
 }
 
+void MainWindow::helpDialog() {
+    auto *dialog = new QDialog(this);
+    dialog->setWindowTitle("Level Editor Guide");
+    auto *browser = new QTextBrowser(dialog);
+
+    QFile file("Editor.md");
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, "Error", "Cannot open help file.");
+        return;
+    }
+    QTextStream in(&file);
+    QString content = in.readAll();
+    file.close();
+
+    browser->setHtml(content);
+    auto *layout = new QVBoxLayout(dialog);
+    layout->addWidget(browser);
+    dialog->setLayout(layout);
+    dialog->resize(1200,800);
+    dialog->exec();
+}
+
 void MainWindow::clearLevel() {
     QMessageBox::StandardButton reply = QMessageBox::question(this, "Clear Level", "Are you sure you want to clear the level?",
                                                               QMessageBox::Yes | QMessageBox::No);
@@ -418,7 +444,7 @@ void MainWindow::undoTilePlacement() {
     }
 }
 
-void MainWindow::openResizeDialog() {
+void MainWindow::resizeDialog() {
     QDialog resizeDialog(this);
     resizeDialog.setWindowTitle("Resize Level");
     auto* layout = new QVBoxLayout(&resizeDialog);
@@ -504,6 +530,7 @@ QWidget* MainWindow::createActionButtons() {
     auto* deleteButton = new QPushButton("Delete Level");connect(deleteButton, &QPushButton::clicked, this, &MainWindow::deleteLevel);topButtonLayout->addWidget(deleteButton);
     auto* importButton = new QPushButton("Import");connect(importButton, &QPushButton::clicked, this, &MainWindow::importFromFile);topButtonLayout->addWidget(importButton);
     auto* exportButton = new QPushButton("Export");connect(exportButton, &QPushButton::clicked, this, &MainWindow::exportToFile);topButtonLayout->addWidget(exportButton);
+    auto* helpButton   = new QPushButton("Help");connect(helpButton, &QPushButton::clicked, this, &MainWindow::helpDialog);topButtonLayout->addWidget(helpButton);
     layout->addWidget(topPanel);
     layout->addStretch();
     layout->addItem(new QSpacerItem(20, 30, QSizePolicy::Minimum, QSizePolicy::Fixed));
@@ -511,7 +538,7 @@ QWidget* MainWindow::createActionButtons() {
     auto* bottomPanel = new QWidget;
     auto* bottomLayout = new QVBoxLayout(bottomPanel);
     auto* clearButton = new QPushButton("Clear level");connect(clearButton, &QPushButton::clicked, this, &MainWindow::clearLevel);bottomLayout->addWidget(clearButton);
-    auto* resizeButton = new QPushButton("Resize level");connect(resizeButton, &QPushButton::clicked, this, &MainWindow::openResizeDialog);bottomLayout->addWidget(resizeButton);
+    auto* resizeButton = new QPushButton("Resize level");connect(resizeButton, &QPushButton::clicked, this, &MainWindow::resizeDialog);bottomLayout->addWidget(resizeButton);
     auto* undoButton = new QPushButton("Undo");connect(undoButton, &QPushButton::clicked, this, &MainWindow::undoTilePlacement);bottomLayout->addWidget(undoButton);
     layout->addWidget(bottomPanel);
 
